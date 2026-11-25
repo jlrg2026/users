@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CoreControl · Gestión de Usuarios & Apps</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root{
+    color-scheme: dark;
+    --bg:#0a0e1a; --bg2:#0f1526; --panel:rgba(20,28,48,.72); --panel-brd:rgba(90,120,200,.25);
+    --txt:#e6ecff; --muted:#8fa1c7;
+    --neon:#00e5ff; --neon2:#7c5cff; --ok:#22d3a5; --warn:#ffb020; --bad:#ff4d6d;
+    --glow: 0 0 24px rgba(0,229,255,.35);
+    --radius:16px;
+    --field-bg:#0f1526; --field-bg-hover:#141c30;
+    --opt-bg:#0f1526; --opt-bg-sel:#14304a; --opt-txt:#e6ecff;
+  }
+  [data-theme="light"]{
+    color-scheme: light;
+    --bg:#eef2fb; --bg2:#e3e9f7; --panel:rgba(255,255,255,.85); --panel-brd:rgba(60,90,160,.18);
+    --txt:#0d1526; --muted:#4d5c7a; --glow:0 0 20px rgba(70,110,220,.18);
+    --field-bg:#ffffff; --field-bg-hover:#f4f7ff;
+    --opt-bg:#ffffff; --opt-bg-sel:#dbe7ff; --opt-txt:#0d1526;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:'Inter',ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    color:var(--txt); background:
+      radial-gradient(1200px 600px at 10% -10%, rgba(124,92,255,.18), transparent 60%),
+      radial-gradient(1000px 500px at 100% 0%, rgba(0,229,255,.15), transparent 60%),
+      radial-gradient(900px 500px at 50% 120%, rgba(34,211,165,.12), transparent 60%),
+      var(--bg);
+    min-height:100vh; overflow-x:hidden;
+  }
+  body::before{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background-image:linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
+                     linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+    background-size:48px 48px; mask-image:radial-gradient(circle at 50% 40%, #000 40%, transparent 85%);
+  }
+  .wrap{position:relative; z-index:1; max-width:1400px; margin:0 auto; padding:20px}
+
+  /* ===== LOGIN ===== */
+  #login{
+    position:fixed; inset:0; z-index:100; display:grid; place-items:center;
+    backdrop-filter:blur(14px); background:rgba(5,8,18,.7);
+  }
+  #login .card{
+    width:min(420px,92vw); padding:36px 32px; border-radius:22px;
+    background:var(--panel); border:1px solid var(--panel-brd);
+    box-shadow:0 30px 80px rgba(0,0,0,.55), var(--glow);
+    text-align:center; animation:pop .5s ease;
+  }
+  @keyframes pop{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}
+  #login .logo{
+    width:72px;height:72px;margin:0 auto 16px;border-radius:20px;display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--neon),var(--neon2));
+    box-shadow:0 0 40px rgba(0,229,255,.6);
+  }
+  #login h1{font-size:22px; letter-spacing:.5px; margin-bottom:6px}
+  #login p{color:var(--muted); font-size:13px; margin-bottom:22px}
+  .field{position:relative; margin-bottom:14px}
+  .field i{position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--muted)}
+  .field input{
+    width:100%; padding:14px 14px 14px 44px; border-radius:12px;
+    background:rgba(255,255,255,.04); border:1px solid var(--panel-brd);
+    color:var(--txt); font-size:14px; outline:none; transition:.2s;
+  }
+  .field input:focus{border-color:var(--neon); box-shadow:0 0 0 3px rgba(0,229,255,.15)}
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    padding:12px 18px; border-radius:12px; border:1px solid var(--panel-brd);
+    background:linear-gradient(135deg,rgba(0,229,255,.15),rgba(124,92,255,.15));
+    color:var(--txt); font-weight:600; cursor:pointer; transition:.2s; font-size:14px;
+  }
+  .btn:hover{transform:translateY(-1px); box-shadow:0 8px 24px rgba(0,229,255,.25); border-color:var(--neon)}
+  .btn.primary{background:linear-gradient(135deg,var(--neon),var(--neon2)); color:#04101a; border:none; width:100%; box-shadow:0 10px 30px rgba(0,229,255,.35)}
+  .btn.primary:hover{filter:brightness(1.08)}
+  .btn.ghost{background:transparent}
+  .btn.danger{background:linear-gradient(135deg,#ff4d6d,#c9184a); color:#fff; border:none}
+  .btn.sm{padding:8px 12px; font-size:12px}
+  #loginErr{color:var(--bad); font-size:12px; margin-top:10px; min-height:16px}
+
+  /* ===== TOPBAR ===== */
+  .top{
+    display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
+    padding:14px 18px; margin-bottom:20px; border-radius:var(--radius);
+    background:var(--panel); border:1px solid var(--panel-brd); backdrop-filter:blur(14px);
+  }
+  .brand{display:flex; align-items:center; gap:12px}
+  .brand .ic{
+    width:44px; height:44px; border-radius:12px; display:grid; place-items:center;
+    background:linear-gradient(135deg,var(--neon),var(--neon2)); box-shadow:0 0 24px rgba(0,229,255,.5);
+  }
+  .brand h1{font-size:18px; letter-spacing:.3px}
+  .brand small{color:var(--muted); font-size:11px}
+  .top-actions{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+
+  /* ===== KPIs ===== */
+  .kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; margin-bottom:20px}
+  .kpi{
+    position:relative; padding:18px; border-radius:var(--radius);
+    background:var(--panel); border:1px solid var(--panel-brd); overflow:hidden;
+  }
+  .kpi::after{content:""; position:absolute; inset:0; background:radial-gradient(300px 120px at 100% 0%, rgba(0,229,255,.12), transparent 70%); pointer-events:none}
+  .kpi .row{display:flex; align-items:center; justify-content:space-between}
+  .kpi .lab{font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:1px}
+  .kpi .val{font-size:30px; font-weight:800; margin-top:8px; letter-spacing:-.5px}
+  .kpi .ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:rgba(0,229,255,.1); color:var(--neon)}
+  .kpi.warn .ic{background:rgba(255,176,32,.12); color:var(--warn)}
+  .kpi.ok .ic{background:rgba(34,211,165,.12); color:var(--ok)}
+  .kpi.bad .ic{background:rgba(255,77,109,.12); color:var(--bad)}
+
+  /* ===== GRID ===== */
+  .grid2{display:grid; grid-template-columns:1.4fr 1fr; gap:16px; margin-bottom:20px}
+  @media(max-width:900px){.grid2{grid-template-columns:1fr}}
+  .panel{
+    padding:18px; border-radius:var(--radius); background:var(--panel);
+    border:1px solid var(--panel-brd); backdrop-filter:blur(14px);
+  }
+  .panel h2{font-size:14px; letter-spacing:.5px; margin-bottom:14px; display:flex; align-items:center; gap:8px; color:var(--muted); text-transform:uppercase}
+  .chartbox{height:260px; position:relative}
+
+  /* ===== TABS ===== */
+  .tabs{display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap}
+  .tab{
+    padding:10px 16px; border-radius:10px; cursor:pointer; font-size:13px; font-weight:600;
+    background:rgba(255,255,255,.03); border:1px solid var(--panel-brd); color:var(--muted); transition:.2s;
+    display:inline-flex; align-items:center; gap:8px;
+  }
+  .tab.active{color:var(--txt); border-color:var(--neon); background:linear-gradient(135deg,rgba(0,229,255,.15),rgba(124,92,255,.15)); box-shadow:0 0 20px rgba(0,229,255,.2)}
+
+  /* ===== TABLES ===== */
+  .toolbar{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; align-items:center}
+
+  /* ===== FIELDS / SELECTS (tema oscuro correcto) ===== */
+  .toolbar input,
+  .toolbar select,
+  .form-grid input,
+  .form-grid select{
+    padding:10px 12px; border-radius:10px;
+    background-color:var(--field-bg);
+    border:1px solid var(--panel-brd);
+    color:var(--txt); font-size:13px; outline:none;
+    transition:background-color .15s, border-color .15s, box-shadow .15s;
+    -webkit-appearance:none; -moz-appearance:none; appearance:none;
+  }
+  .toolbar select, .form-grid select{
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+      linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position:
+      calc(100% - 16px) calc(50% - 2px),
+      calc(100% - 11px) calc(50% - 2px);
+    background-size:5px 5px, 5px 5px;
+    background-repeat:no-repeat;
+    padding-right:34px;
+  }
+  .toolbar input:hover,
+  .toolbar select:hover,
+  .form-grid input:hover,
+  .form-grid select:hover{ background-color:var(--field-bg-hover); }
+  .toolbar input:focus,
+  .toolbar select:focus,
+  .form-grid input:focus,
+  .form-grid select:focus{
+    border-color:var(--neon);
+    box-shadow:0 0 0 3px rgba(0,229,255,.15);
+  }
+  .toolbar input::placeholder, .form-grid input::placeholder{ color:var(--muted); }
+
+  /* Opciones desplegables (soporte multi-navegador) */
+  select option,
+  select optgroup{
+    background-color:var(--opt-bg);
+    color:var(--opt-txt);
+  }
+  select option:checked,
+  select option:hover{
+    background-color:var(--opt-bg-sel);
+    color:var(--opt-txt);
+  }
+  /* Firefox: fondo del listado */
+  @-moz-document url-prefix(){
+    select{ background-color:var(--field-bg); color:var(--txt); }
+    option{ background-color:var(--opt-bg); color:var(--opt-txt); }
+  }
+
+  table{width:100%; border-collapse:collapse; font-size:13px}
+  thead th{
+    text-align:left; padding:12px 10px; color:var(--muted); font-size:11px;
+    text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid var(--panel-brd);
+    cursor:pointer; user-select:none; white-space:nowrap;
+  }
+  thead th:hover{color:var(--neon)}
+  tbody td{padding:12px 10px; border-bottom:1px solid rgba(255,255,255,.04); vertical-align:middle}
+  tbody tr:hover{background:rgba(0,229,255,.04)}
+  .badge{
+    display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px;
+    font-size:11px; font-weight:700; letter-spacing:.3px;
+  }
+  .badge.ok{background:rgba(34,211,165,.15); color:var(--ok)}
+  .badge.warn{background:rgba(255,176,32,.15); color:var(--warn)}
+  .badge.bad{background:rgba(255,77,109,.15); color:var(--bad)}
+  .badge.info{background:rgba(0,229,255,.15); color:var(--neon)}
+  .badge.purple{background:rgba(124,92,255,.18); color:#b9a5ff}
+  .actions{display:flex; gap:6px}
+  .icon-btn{
+    width:32px; height:32px; border-radius:8px; display:grid; place-items:center;
+    background:rgba(255,255,255,.04); border:1px solid var(--panel-brd); color:var(--muted);
+    cursor:pointer; transition:.2s;
+  }
+  .icon-btn:hover{color:var(--neon); border-color:var(--neon)}
+  .icon-btn.del:hover{color:var(--bad); border-color:var(--bad)}
+
+  /* ===== MODAL ===== */
+  .modal{
+    position:fixed; inset:0; z-index:80; display:none; place-items:center;
+    background:rgba(5,8,18,.7); backdrop-filter:blur(8px); padding:20px;
+  }
+  .modal.show{display:grid}
+  .modal .box{
+    width:min(560px,100%); max-height:90vh; overflow:auto; padding:26px; border-radius:20px;
+    background:var(--bg2); border:1px solid var(--panel-brd); box-shadow:0 30px 80px rgba(0,0,0,.6);
+    animation:pop .3s ease;
+  }
+  .modal h3{font-size:18px; margin-bottom:18px; display:flex; align-items:center; gap:10px}
+  .form-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  @media(max-width:560px){.form-grid{grid-template-columns:1fr}}
+  .form-grid label{font-size:12px; color:var(--muted); display:block; margin-bottom:6px; text-transform:uppercase; letter-spacing:.5px}
+  .form-grid input, .form-grid select{
+    width:100%; padding:11px 12px; border-radius:10px;
+    background-color:var(--field-bg);
+    border:1px solid var(--panel-brd); color:var(--txt); font-size:13px; outline:none;
+  }
+  .form-grid input:focus, .form-grid select:focus{border-color:var(--neon); box-shadow:0 0 0 3px rgba(0,229,255,.15)}
+  .form-grid .full{grid-column:1/-1}
+  .modal-foot{display:flex; justify-content:flex-end; gap:10px; margin-top:22px}
+
+  /* ===== TOAST ===== */
+  #toasts{position:fixed; top:20px; right:20px; z-index:200; display:flex; flex-direction:column; gap:10px}
+  .toast{
+    padding:12px 18px; border-radius:12px; background:var(--bg2); border:1px solid var(--panel-brd);
+    box-shadow:0 10px 30px rgba(0,0,0,.4); font-size:13px; display:flex; align-items:center; gap:10px;
+    animation:slide .3s ease; min-width:240px;
+  }
+  .toast.ok{border-left:3px solid var(--ok)}
+  .toast.bad{border-left:3px solid var(--bad)}
+  .toast.info{border-left:3px solid var(--neon)}
+  @keyframes slide{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+
+  /* ===== STATUS SYNC ===== */
+  .sync{display:inline-flex; align-items:center; gap:6px; font-size:11px; color:var(--muted); padding:6px 10px; border-radius:999px; background:rgba(255,255,255,.04); border:1px solid var(--panel-brd)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+  .dot.on{background:var(--ok); box-shadow:0 0 8px var(--ok); animation:pulse 1.8s infinite}
+  .dot.off{background:var(--warn)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  .hidden{display:none !important}
+  .muted{color:var(--muted)}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:rgba(0,229,255,.25); border-radius:8px}
+  ::-webkit-scrollbar-track{background:transparent}
+</style>
+</head>
+<body>
+
+<!-- ========== LOGIN ========== -->
+<div id="login">
+  <form class="card" id="loginForm" autocomplete="off">
+    <div class="logo"><i data-lucide="shield-check" style="width:36px;height:36px;color:#04101a"></i></div>
+    <h1>CoreControl</h1>
+    <p>Acceso restringido · Solo administrador</p>
+    <div class="field">
+      <i data-lucide="user"></i>
+      <input type="text" id="loginUser" placeholder="Usuario" required />
+    </div>
+    <div class="field">
+      <i data-lucide="lock"></i>
+      <input type="password" id="loginPass" placeholder="Contraseña" required />
+    </div>
+    <button class="btn primary" type="submit">
+      <i data-lucide="log-in" style="width:16px;height:16px"></i> Entrar
+    </button>
+    <div id="loginErr"></div>
+    <p style="margin-top:18px; font-size:11px">
+      Default: <b>admin</b> / <b>CoreControl2025!</b> — cambia la contraseña en el código.
+    </p>
+  </form>
+</div>
+
+<!-- ========== APP ========== -->
+<div class="wrap hidden" id="app">
+
+  <!-- TOPBAR -->
+  <div class="top">
+    <div class="brand">
+      <div class="ic"><i data-lucide="shield-check" style="width:22px;height:22px;color:#04101a"></i></div>
+      <div>
+        <h1>CoreControl</h1>
+        <small>Gestión de Usuarios & Apps Core</small>
+      </div>
+    </div>
+    <div class="top-actions">
+      <span class="sync" id="syncStatus"><span class="dot off"></span> <span>Modo demo</span></span>
+      <button class="btn sm ghost" id="btnTheme" title="Cambiar tema"><i data-lucide="sun-moon"></i></button>
+      <button class="btn sm ghost" id="btnExportAll" title="Reporte general PDF"><i data-lucide="file-text"></i> Reporte Global</button>
+      <button class="btn sm danger" id="btnLogout" title="Salir"><i data-lucide="log-out"></i></button>
+    </div>
+  </div>
+
+  <!-- KPIS -->
+  <div class="kpis" id="kpis"></div>
+
+  <!-- CHARTS -->
+  <div class="grid2">
+    <div class="panel">
+      <h2><i data-lucide="bar-chart-3" style="width:16px;height:16px"></i> Distribución por Rol</h2>
+      <div class="chartbox"><canvas id="chartRoles"></canvas></div>
+    </div>
+    <div class="panel">
+      <h2><i data-lucide="pie-chart" style="width:16px;height:16px"></i> Apps por Ambiente</h2>
+      <div class="chartbox"><canvas id="chartApps"></canvas></div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <div class="tab active" data-tab="users"><i data-lucide="users" style="width:16px;height:16px"></i> Usuarios</div>
+    <div class="tab" data-tab="apps"><i data-lucide="layout-grid" style="width:16px;height:16px"></i> Apps Core</div>
+  </div>
+
+  <!-- USERS -->
+  <div class="panel" id="tab-users">
+    <div class="toolbar">
+      <input type="text" id="searchUsers" placeholder="🔎 Buscar usuario..." style="flex:1;min-width:180px"/>
+      <select id="filterRole">
+        <option value="">Todos los roles</option>
+        <option>Admin</option>
+        <option>Analista</option>
+        <option>Invitado</option>
+        <option>Operador</option>
+        <option>Supervisor</option>
+        <option>Usuario Final</option>
+      </select>
+      <select id="filterStatus">
+        <option value="">Todos los estados</option>
+        <option>Activo</option><option>Inactivo</option><option>Suspendido</option><option>Pendiente</option>
+      </select>
+      <button class="btn sm" id="btnPdfUsers"><i data-lucide="file-down"></i> PDF</button>
+      <button class="btn primary" id="btnNewUser" style="width:auto"><i data-lucide="plus"></i> Nuevo</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table id="tblUsers">
+        <thead>
+          <tr>
+            <th data-sort="nombre">Nombre</th>
+            <th data-sort="email">Email</th>
+            <th data-sort="rol">Rol</th>
+            <th data-sort="estado">Estado</th>
+            <th data-sort="app">App Core</th>
+            <th data-sort="fecha">Alta</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- APPS -->
+  <div class="panel hidden" id="tab-apps">
+    <div class="toolbar">
+      <input type="text" id="searchApps" placeholder="🔎 Buscar app..." style="flex:1;min-width:180px"/>
+      <select id="filterEnv">
+        <option value="">Todos los ambientes</option>
+        <option>Producción</option><option>Staging</option><option>Desarrollo</option><option>QA</option>
+      </select>
+      <select id="filterAppStatus">
+        <option value="">Todos los estados</option>
+        <option>Activa</option><option>Mantenimiento</option><option>Deprecada</option><option>En desarrollo</option>
+      </select>
+      <button class="btn sm" id="btnPdfApps"><i data-lucide="file-down"></i> PDF</button>
+      <button class="btn primary" id="btnNewApp" style="width:auto"><i data-lucide="plus"></i> Nueva</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table id="tblApps">
+        <thead>
+          <tr>
+            <th data-sort="nombre">App</th>
+            <th data-sort="version">Versión</th>
+            <th data-sort="ambiente">Ambiente</th>
+            <th data-sort="estado">Estado</th>
+            <th data-sort="responsable">Responsable</th>
+            <th data-sort="fecha">Actualización</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ========== MODAL FORM ========== -->
+<div class="modal" id="modal">
+  <div class="box">
+    <h3 id="modalTitle"><i data-lucide="plus-circle"></i> Nuevo</h3>
+    <form id="modalForm" class="form-grid"></form>
+    <div class="modal-foot">
+      <button class="btn ghost" type="button" id="modalCancel">Cancelar</button>
+      <button class="btn primary" type="submit" form="modalForm" style="width:auto"><i data-lucide="save"></i> Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+/* ============================================================
+   1. CONFIG
+============================================================ */
+const CONFIG = {
+  ADMIN_USER: 'admin',
+  ADMIN_HASH: 'a3f9a0e0c9b1f9f5c1f6b8a2e3d4c5b6a7f8e9d0c1b2a3f4e5d6c7b8a9f0e1d2',
+  SHEET_API: '',
+  SHEET_TOKEN: 'MiTokenSecreto2025'
+};
+async function sha256(msg){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+window.sha256 = sha256;
+
+/* ============================================================
+   2. UTILIDADES
+============================================================ */
+const $ = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
+const uid = ()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const today = ()=>new Date().toISOString().slice(0,10);
+const fmtDate = d => d ? new Date(d).toLocaleDateString('es-MX',{year:'numeric',month:'short',day:'2-digit'}) : '—';
+function toast(msg,type='info'){
+  const el = document.createElement('div');
+  el.className = 'toast '+type;
+  const ic = type==='ok'?'check-circle':type==='bad'?'x-circle':'info';
+  el.innerHTML = `<i data-lucide="${ic}" style="width:18px;height:18px"></i><span>${msg}</span>`;
+  $('#toasts').appendChild(el);
+  lucide.createIcons();
+  setTimeout(()=>{ el.style.opacity='0'; el.style.transform='translateX(100%)'; setTimeout(()=>el.remove(),300); }, 3200);
+}
+
+/* ============================================================
+   3. CATÁLOGOS
+============================================================ */
+const ROLES = ['Admin','Analista','Invitado','Operador','Supervisor','Usuario Final'];
+const APPS_CORE = [
+  'APPLE Developer',
+  'Correo DERMAVAN.MX',
+  'Cotizador SAP',
+  'CRM Harmony',
+  'SAP B1',
+  'Servidores Moodle',
+  'Servidores SAP'
+];
+
+/* ============================================================
+   4. AUTH
+============================================================ */
+const AUTH_KEY = 'corecontrol.auth';
+async function login(user, pass){
+  const hash = await sha256(pass);
+  const okUser = user.trim().toLowerCase() === CONFIG.ADMIN_USER;
+  const okPass = (hash === CONFIG.ADMIN_HASH) || (pass === 'CoreControl2025!');
+  if(okUser && okPass){
+    sessionStorage.setItem(AUTH_KEY,'1');
+    return true;
+  }
+  return false;
+}
+function isLogged(){ return sessionStorage.getItem(AUTH_KEY)==='1'; }
+
+$('#loginForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const u = $('#loginUser').value, p = $('#loginPass').value;
+  if(await login(u,p)){
+    $('#login').classList.add('hidden');
+    $('#app').classList.remove('hidden');
+    boot();
+  } else {
+    $('#loginErr').textContent = 'Credenciales incorrectas';
+  }
+});
+$('#btnLogout').addEventListener('click', ()=>{
+  sessionStorage.removeItem(AUTH_KEY);
+  location.reload();
+});
+
+/* ============================================================
+   5. ESTADO / DATOS
+============================================================ */
+const DB_KEY = 'corecontrol.db.v1';
+let DB = { users:[], apps:[] };
+
+function seedDemo(){
+  if(DB.users.length) return;
+  const roles = ROLES;
+  const estados = ['Activo','Inactivo','Suspendido','Pendiente'];
+  const nombres = ['Ana Torres','Luis Ramírez','María López','Carlos Ruiz','Sofía Méndez','Jorge Díaz','Elena Castro','Ricardo Vega','Paola Núñez','Andrés Gil'];
+  DB.users = nombres.map((n,i)=>({
+    id: uid(),
+    nombre: n,
+    email: n.toLowerCase().replace(/[^a-z]/g,'.')+'@empresa.com',
+    rol: roles[i%roles.length],
+    estado: estados[i%estados.length],
+    app: APPS_CORE[i%APPS_CORE.length],
+    fecha: new Date(Date.now()-i*86400000*3).toISOString().slice(0,10)
+  }));
+  const envs = ['Producción','Staging','Desarrollo','QA'];
+  const appEst = ['Activa','Mantenimiento','Deprecada','En desarrollo'];
+  DB.apps = APPS_CORE.map((n,i)=>({
+    id: uid(),
+    nombre: n,
+    version: `v${1+i}.${i}.0`,
+    ambiente: envs[i%envs.length],
+    estado: appEst[i%appEst.length],
+    responsable: nombres[(i+3)%nombres.length],
+    fecha: new Date(Date.now()-i*86400000*2).toISOString().slice(0,10)
+  }));
+  save();
+}
+function save(){
+  localStorage.setItem(DB_KEY, JSON.stringify(DB));
+  syncToSheet();
+}
+function load(){
+  try{ DB = JSON.parse(localStorage.getItem(DB_KEY)) || {users:[],apps:[]}; }catch{ DB={users:[],apps:[]}; }
+  if(!DB.users.length) seedDemo();
+}
+
+/* ============================================================
+   6. GOOGLE SHEETS SYNC (opcional)
+============================================================ */
+async function syncToSheet(){
+  if(!CONFIG.SHEET_API) return;
+  try{
+    await fetch(CONFIG.SHEET_API,{
+      method:'POST', mode:'no-cors',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ token: CONFIG.SHEET_TOKEN, data: DB })
+    });
+    setSync('on','Google Sheets');
+  }catch(e){ setSync('off','Error sync'); }
+}
+async function pullFromSheet(){
+  if(!CONFIG.SHEET_API) return;
+  try{
+    const r = await fetch(CONFIG.SHEET_API+'?token='+encodeURIComponent(CONFIG.SHEET_TOKEN));
+    const j = await r.json();
+    if(j && j.data && j.data.users){
+      DB = j.data; localStorage.setItem(DB_KEY, JSON.stringify(DB));
+      setSync('on','Google Sheets');
+      renderAll();
+    }
+  }catch(e){ setSync('off','Error pull'); }
+}
+function setSync(state,label){
+  const el = $('#syncStatus');
+  el.innerHTML = `<span class="dot ${state}"></span> <span>${label}</span>`;
+}
+
+/* ============================================================
+   7. RENDER KPIs
+============================================================ */
+function renderKpis(){
+  const u = DB.users, a = DB.apps;
+  const activos = u.filter(x=>x.estado==='Activo').length;
+  const suspendidos = u.filter(x=>x.estado==='Suspendido').length;
+  const appsActivas = a.filter(x=>x.estado==='Activa').length;
+  const cards = [
+    {lab:'Usuarios Totales', val:u.length, ic:'users', cls:''},
+    {lab:'Usuarios Activos', val:activos, ic:'user-check', cls:'ok'},
+    {lab:'Suspendidos', val:suspendidos, ic:'user-x', cls:'bad'},
+    {lab:'Apps Core', val:a.length, ic:'layout-grid', cls:''},
+    {lab:'Apps Activas', val:appsActivas, ic:'check-circle-2', cls:'ok'},
+    {lab:'Mantenimiento', val:a.filter(x=>x.estado==='Mantenimiento').length, ic:'wrench', cls:'warn'}
+  ];
+  $('#kpis').innerHTML = cards.map(c=>`
+    <div class="kpi ${c.cls}">
+      <div class="row">
+        <div>
+          <div class="lab">${c.lab}</div>
+          <div class="val" data-count="${c.val}">0</div>
+        </div>
+        <div class="ic"><i data-lucide="${c.ic}" style="width:20px;height:20px"></i></div>
+      </div>
+    </div>
+  `).join('');
+  lucide.createIcons();
+  $$('.val[data-count]').forEach(el=>{
+    const target = +el.dataset.count; let cur=0;
+    const step = Math.max(1, Math.ceil(target/30));
+    const iv = setInterval(()=>{ cur+=step; if(cur>=target){cur=target;clearInterval(iv);} el.textContent=cur; },25);
+  });
+}
+
+/* ============================================================
+   8. RENDER CHARTS
+============================================================ */
+let chart1, chart2;
+function renderCharts(){
+  const u = DB.users, a = DB.apps;
+  const roleData = ROLES.map(r=>u.filter(x=>x.rol===r).length);
+  const envs = ['Producción','Staging','Desarrollo','QA'];
+  const envData = envs.map(e=>a.filter(x=>x.ambiente===e).length);
+
+  const palette = ['#00e5ff','#7c5cff','#22d3a5','#ffb020','#ff4d6d','#00b8d4'];
+  chart1?.destroy(); chart2?.destroy();
+
+  const commonOpts = {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ labels:{ color:getComputedStyle(document.body).getPropertyValue('--txt'), font:{size:11} } } },
+    scales:{
+      x:{ ticks:{color:'#8fa1c7'}, grid:{color:'rgba(255,255,255,.05)'} },
+      y:{ ticks:{color:'#8fa1c7'}, grid:{color:'rgba(255,255,255,.05)'} }
+    }
+  };
+
+  chart1 = new Chart($('#chartRoles'), {
+    type:'bar',
+    data:{ labels:ROLES, datasets:[{ label:'Usuarios', data:roleData, backgroundColor:palette, borderRadius:8, borderSkipped:false }] },
+    options: commonOpts
+  });
+
+  chart2 = new Chart($('#chartApps'), {
+    type:'doughnut',
+    data:{ labels:envs, datasets:[{ data:envData, backgroundColor:palette, borderWidth:0 }] },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'65%',
+      plugins:{ legend:{ position:'bottom', labels:{color:'#8fa1c7', padding:14, font:{size:11}} } } }
+  });
+}
+
+/* ============================================================
+   9. TABLAS
+============================================================ */
+let sortUsers = {key:'nombre', asc:true};
+let sortApps  = {key:'nombre', asc:true};
+
+function badgeEstado(est){
+  const map = {
+    'Activo':'ok','Inactivo':'warn','Suspendido':'bad','Pendiente':'info',
+    'Activa':'ok','Mantenimiento':'warn','Deprecada':'bad','En desarrollo':'info'
+  };
+  return `<span class="badge ${map[est]||'info'}">${est}</span>`;
+}
+function badgeRol(r){
+  const map = {'Admin':'purple','Analista':'info','Supervisor':'warn','Operador':'ok','Invitado':'info','Usuario Final':'ok'};
+  return `<span class="badge ${map[r]||'info'}">${r}</span>`;
+}
+
+function getFilteredUsers(){
+  const q = $('#searchUsers').value.toLowerCase();
+  const fr = $('#filterRole').value;
+  const fs = $('#filterStatus').value;
+  return DB.users.filter(u=>{
+    if(q && !(u.nombre+u.email+u.app).toLowerCase().includes(q)) return false;
+    if(fr && u.rol!==fr) return false;
+    if(fs && u.estado!==fs) return false;
+    return true;
+  }).sort((a,b)=>{
+    const k=sortUsers.key, d=sortUsers.asc?1:-1;
+    return (a[k]>b[k]?1:a[k]<b[k]?-1:0)*d;
+  });
+}
+function getFilteredApps(){
+  const q = $('#searchApps').value.toLowerCase();
+  const fe = $('#filterEnv').value;
+  const fs = $('#filterAppStatus').value;
+  return DB.apps.filter(a=>{
+    if(q && !(a.nombre+a.responsable+a.version).toLowerCase().includes(q)) return false;
+    if(fe && a.ambiente!==fe) return false;
+    if(fs && a.estado!==fs) return false;
+    return true;
+  }).sort((a,b)=>{
+    const k=sortApps.key, d=sortApps.asc?1:-1;
+    return (a[k]>b[k]?1:a[k]<b[k]?-1:0)*d;
+  });
+}
+
+function renderUsers(){
+  const rows = getFilteredUsers();
+  const tb = $('#tblUsers tbody');
+  if(!rows.length){ tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted)">Sin resultados</td></tr>`; return; }
+  tb.innerHTML = rows.map(u=>`
+    <tr>
+      <td><b>${u.nombre}</b></td>
+      <td class="muted">${u.email}</td>
+      <td>${badgeRol(u.rol)}</td>
+      <td>${badgeEstado(u.estado)}</td>
+      <td><span class="badge info">${u.app||'—'}</span></td>
+      <td class="muted">${fmtDate(u.fecha)}</td>
+      <td>
+        <div class="actions">
+          <button class="icon-btn" onclick="editUser('${u.id}')" title="Editar"><i data-lucide="pencil" style="width:14px;height:14px"></i></button>
+          <button class="icon-btn del" onclick="delUser('${u.id}')" title="Eliminar"><i data-lucide="trash-2" style="width:14px;height:14px"></i></button>
+        </div>
+      </td>
+    </tr>`).join('');
+  lucide.createIcons();
+}
+function renderApps(){
+  const rows = getFilteredApps();
+  const tb = $('#tblApps tbody');
+  if(!rows.length){ tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted)">Sin resultados</td></tr>`; return; }
+  tb.innerHTML = rows.map(a=>`
+    <tr>
+      <td><b>${a.nombre}</b></td>
+      <td><span class="badge purple">${a.version}</span></td>
+      <td><span class="badge info">${a.ambiente}</span></td>
+      <td>${badgeEstado(a.estado)}</td>
+      <td class="muted">${a.responsable||'—'}</td>
+      <td class="muted">${fmtDate(a.fecha)}</td>
+      <td>
+        <div class="actions">
+          <button class="icon-btn" onclick="editApp('${a.id}')" title="Editar"><i data-lucide="pencil" style="width:14px;height:14px"></i></button>
+          <button class="icon-btn del" onclick="delApp('${a.id}')" title="Eliminar"><i data-lucide="trash-2" style="width:14px;height:14px"></i></button>
+        </div>
+      </td>
+    </tr>`).join('');
+  lucide.createIcons();
+}
+
+function renderAll(){ renderKpis(); renderCharts(); renderUsers(); renderApps(); }
+
+/* ============================================================
+   10. CRUD USUARIOS
+============================================================ */
+function openModal(title, html){
+  $('#modalTitle').innerHTML = title;
+  $('#modalForm').innerHTML = html;
+  $('#modal').classList.add('show');
+  lucide.createIcons();
+}
+function closeModal(){ $('#modal').classList.remove('show'); }
+$('#modalCancel').onclick = closeModal;
+
+function optionsRoles(selected){
+  return ROLES.map(r=>`<option ${r===selected?'selected':''}>${r}</option>`).join('');
+}
+function optionsAppsCore(selected){
+  return APPS_CORE.map(a=>`<option ${a===selected?'selected':''}>${a}</option>`).join('');
+}
+
+window.editUser = id => {
+  const u = DB.users.find(x=>x.id===id); if(!u) return;
+  openModal('<i data-lucide="pencil"></i> Editar Usuario', `
+    <div><label>Nombre</label><input name="nombre" required value="${u.nombre}"/></div>
+    <div><label>Email</label><input name="email" type="email" required value="${u.email}"/></div>
+    <div><label>Rol</label><select name="rol">${optionsRoles(u.rol)}</select></div>
+    <div><label>Estado</label><select name="estado">${['Activo','Inactivo','Suspendido','Pendiente'].map(e=>`<option ${e===u.estado?'selected':''}>${e}</option>`).join('')}</select></div>
+    <div class="full"><label>App Core asignada</label><select name="app"><option value="">—</option>${optionsAppsCore(u.app)}</select></div>
+    <input type="hidden" name="id" value="${u.id}"/>
+  `);
+};
+window.delUser = id => {
+  if(!confirm('¿Eliminar usuario?')) return;
+  DB.users = DB.users.filter(x=>x.id!==id);
+  save(); renderAll(); toast('Usuario eliminado','bad');
+};
+$('#btnNewUser').onclick = ()=>{
+  openModal('<i data-lucide="user-plus"></i> Nuevo Usuario', `
+    <div><label>Nombre</label><input name="nombre" required/></div>
+    <div><label>Email</label><input name="email" type="email" required/></div>
+    <div><label>Rol</label><select name="rol">${optionsRoles()}</select></div>
+    <div><label>Estado</label><select name="estado">${['Activo','Inactivo','Suspendido','Pendiente'].map(e=>`<option>${e}</option>`).join('')}</select></div>
+    <div class="full"><label>App Core asignada</label><select name="app"><option value="">—</option>${optionsAppsCore()}</select></div>
+    <input type="hidden" name="id" value=""/>
+  `);
+};
+
+/* ============================================================
+   11. CRUD APPS
+============================================================ */
+window.editApp = id => {
+  const a = DB.apps.find(x=>x.id===id); if(!a) return;
+  openModal('<i data-lucide="pencil"></i> Editar App Core', `
+    <div><label>Nombre</label><input name="nombre" required value="${a.nombre}"/></div>
+    <div><label>Versión</label><input name="version" required value="${a.version}"/></div>
+    <div><label>Ambiente</label><select name="ambiente">${['Producción','Staging','Desarrollo','QA'].map(e=>`<option ${e===a.ambiente?'selected':''}>${e}</option>`).join('')}</select></div>
+    <div><label>Estado</label><select name="estado">${['Activa','Mantenimiento','Deprecada','En desarrollo'].map(e=>`<option ${e===a.estado?'selected':''}>${e}</option>`).join('')}</select></div>
+    <div class="full"><label>Responsable</label><input name="responsable" value="${a.responsable||''}"/></div>
+    <input type="hidden" name="id" value="${a.id}"/>
+  `);
+};
+window.delApp = id => {
+  if(!confirm('¿Eliminar app?')) return;
+  DB.apps = DB.apps.filter(x=>x.id!==id);
+  save(); renderAll(); toast('App eliminada','bad');
+};
+$('#btnNewApp').onclick = ()=>{
+  openModal('<i data-lucide="layout-grid"></i> Nueva App Core', `
+    <div><label>Nombre</label><input name="nombre" required placeholder="Ej. SAP B1"/></div>
+    <div><label>Versión</label><input name="version" required placeholder="v1.0.0"/></div>
+    <div><label>Ambiente</label><select name="ambiente">${['Producción','Staging','Desarrollo','QA'].map(e=>`<option>${e}</option>`).join('')}</select></div>
+    <div><label>Estado</label><select name="estado">${['Activa','Mantenimiento','Deprecada','En desarrollo'].map(e=>`<option>${e}</option>`).join('')}</select></div>
+    <div class="full"><label>Responsable</label><input name="responsable"/></div>
+    <input type="hidden" name="id" value=""/>
+  `);
+};
+
+/* ============================================================
+   12. SUBMIT MODAL
+============================================================ */
+$('#modalForm').addEventListener('submit', e=>{
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const id = f.get('id');
+  const isUser = f.has('email');
+  const data = Object.fromEntries(f.entries());
+  if(isUser){
+    if(id){
+      const i = DB.users.findIndex(x=>x.id===id);
+      DB.users[i] = {...DB.users[i], ...data};
+    } else {
+      DB.users.push({ id: uid(), fecha: today(), ...data });
+    }
+  } else {
+    if(id){
+      const i = DB.apps.findIndex(x=>x.id===id);
+      DB.apps[i] = {...DB.apps[i], ...data};
+    } else {
+      DB.apps.push({ id: uid(), fecha: today(), ...data });
+    }
+  }
+  save(); closeModal(); renderAll();
+  toast(isUser?'Usuario guardado':'App guardada','ok');
+});
+
+/* ============================================================
+   13. FILTROS / SORT
+============================================================ */
+['searchUsers','filterRole','filterStatus'].forEach(id=>$('#'+id).addEventListener('input',renderUsers));
+['searchApps','filterEnv','filterAppStatus'].forEach(id=>$('#'+id).addEventListener('input',renderApps));
+$$('#tblUsers thead th[data-sort]').forEach(th=>th.onclick=()=>{
+  const k=th.dataset.sort;
+  sortUsers.asc = sortUsers.key===k ? !sortUsers.asc : true;
+  sortUsers.key = k; renderUsers();
+});
+$$('#tblApps thead th[data-sort]').forEach(th=>th.onclick=()=>{
+  const k=th.dataset.sort;
+  sortApps.asc = sortApps.key===k ? !sortApps.asc : true;
+  sortApps.key = k; renderApps();
+});
+
+/* ============================================================
+   14. TABS
+============================================================ */
+$$('.tab').forEach(t=>t.onclick=()=>{
+  $$('.tab').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');
+  const tab = t.dataset.tab;
+  $('#tab-users').classList.toggle('hidden', tab!=='users');
+  $('#tab-apps').classList.toggle('hidden', tab!=='apps');
+});
+
+/* ============================================================
+   15. TEMA
+============================================================ */
+$('#btnTheme').onclick = ()=>{
+  const cur = document.documentElement.getAttribute('data-theme');
+  document.documentElement.setAttribute('data-theme', cur==='dark'?'light':'dark');
+  renderCharts();
+};
+
+/* ============================================================
+   16. REPORTES PDF PROFESIONALES
+============================================================ */
+function pdfHeader(doc, title, subtitle){
+  const W = doc.internal.pageSize.getWidth();
+  doc.setFillColor(10,14,26); doc.rect(0,0,W,32,'F');
+  doc.setFillColor(0,229,255); doc.rect(0,32,W,2,'F');
+  doc.setFillColor(124,92,255); doc.rect(W/2,32,W/2,2,'F');
+  doc.setTextColor(0,229,255); doc.setFontSize(16); doc.setFont('helvetica','bold');
+  doc.text('CoreControl', 14, 14);
+  doc.setTextColor(230,236,255); doc.setFontSize(11); doc.setFont('helvetica','normal');
+  doc.text(title, 14, 22);
+  doc.setFontSize(8); doc.setTextColor(143,161,199);
+  doc.text(subtitle, 14, 28);
+  const dateStr = new Date().toLocaleString('es-MX');
+  doc.setTextColor(143,161,199); doc.setFontSize(8);
+  doc.text('Generado: '+dateStr, W-14, 14, {align:'right'});
+  doc.text('Documento confidencial', W-14, 22, {align:'right'});
+}
+function pdfFooter(doc){
+  const pages = doc.internal.getNumberOfPages();
+  const W = doc.internal.pageSize.getWidth();
+  for(let i=1;i<=pages;i++){
+    doc.setPage(i);
+    doc.setFontSize(8); doc.setTextColor(143,161,199);
+    doc.text('CoreControl · Reporte generado automáticamente', 14, doc.internal.pageSize.getHeight()-8);
+    doc.text(`Página ${i} / ${pages}`, W-14, doc.internal.pageSize.getHeight()-8, {align:'right'});
+  }
+}
+function pdfKPIs(doc, kpis){
+  let y = 42;
+  const W = doc.internal.pageSize.getWidth();
+  const bw = (W-28-8*2)/3;
+  kpis.forEach((k,i)=>{
+    const col = i%3, row = Math.floor(i/3);
+    const x = 14 + col*(bw+8);
+    const yy = y + row*18;
+    doc.setFillColor(20,28,48); doc.roundedRect(x, yy, bw, 15, 2,2,'F');
+    doc.setTextColor(143,161,199); doc.setFontSize(7);
+    doc.text(k.lab.toUpperCase(), x+4, yy+5);
+    doc.setTextColor(0,229,255); doc.setFontSize(13); doc.setFont('helvetica','bold');
+    doc.text(String(k.val), x+4, yy+12);
+    doc.setFont('helvetica','normal');
+  });
+}
+
+$('#btnPdfUsers').onclick = ()=>{
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('landscape','mm','a4');
+  const rows = getFilteredUsers();
+  const kpis = [
+    {lab:'Total', val:rows.length},
+    {lab:'Activos', val:rows.filter(r=>r.estado==='Activo').length},
+    {lab:'Suspendidos', val:rows.filter(r=>r.estado==='Suspendido').length},
+    {lab:'Admins', val:rows.filter(r=>r.rol==='Admin').length},
+    {lab:'Apps distintas', val:new Set(rows.map(r=>r.app)).size},
+    {lab:'Inactivos', val:rows.filter(r=>r.estado==='Inactivo').length}
+  ];
+  pdfHeader(doc,'Reporte de Usuarios','Filtro aplicado · todas las variantes de campos');
+  pdfKPIs(doc,kpis);
+  doc.autoTable({
+    startY: 42 + Math.ceil(kpis.length/3)*18 + 4,
+    head:[['Nombre','Email','Rol','Estado','App Core','Alta','ID']],
+    body: rows.map(r=>[r.nombre, r.email, r.rol, r.estado, r.app||'—', fmtDate(r.fecha), r.id]),
+    styles:{ fontSize:9, cellPadding:2.5, textColor:[30,40,60] },
+    headStyles:{ fillColor:[10,14,26], textColor:[0,229,255], fontStyle:'bold', fontSize:9 },
+    alternateRowStyles:{ fillColor:[240,245,255] },
+    didParseCell: d => {
+      if(d.section==='body' && d.column.index===3){
+        const v=d.cell.raw;
+        if(v==='Activo') d.cell.styles.textColor=[16,140,110];
+        else if(v==='Suspendido') d.cell.styles.textColor=[200,30,60];
+        else if(v==='Inactivo') d.cell.styles.textColor=[170,110,0];
+      }
+    }
+  });
+  pdfFooter(doc);
+  doc.save(`Reporte_Usuarios_${today()}.pdf`);
+  toast('PDF de usuarios generado','ok');
+};
+
+$('#btnPdfApps').onclick = ()=>{
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('landscape','mm','a4');
+  const rows = getFilteredApps();
+  const kpis = [
+    {lab:'Total Apps', val:rows.length},
+    {lab:'Activas', val:rows.filter(r=>r.estado==='Activa').length},
+    {lab:'Mantenimiento', val:rows.filter(r=>r.estado==='Mantenimiento').length},
+    {lab:'Producción', val:rows.filter(r=>r.ambiente==='Producción').length},
+    {lab:'Staging', val:rows.filter(r=>r.ambiente==='Staging').length},
+    {lab:'Deprecadas', val:rows.filter(r=>r.estado==='Deprecada').length}
+  ];
+  pdfHeader(doc,'Reporte de Apps Core','Filtro aplicado · todas las variantes de campos');
+  pdfKPIs(doc,kpis);
+  doc.autoTable({
+    startY: 42 + Math.ceil(kpis.length/3)*18 + 4,
+    head:[['App','Versión','Ambiente','Estado','Responsable','Actualización','ID']],
+    body: rows.map(r=>[r.nombre, r.version, r.ambiente, r.estado, r.responsable||'—', fmtDate(r.fecha), r.id]),
+    styles:{ fontSize:9, cellPadding:2.5, textColor:[30,40,60] },
+    headStyles:{ fillColor:[10,14,26], textColor:[0,229,255], fontStyle:'bold', fontSize:9 },
+    alternateRowStyles:{ fillColor:[240,245,255] },
+    didParseCell: d => {
+      if(d.section==='body' && d.column.index===3){
+        const v=d.cell.raw;
+        if(v==='Activa') d.cell.styles.textColor=[16,140,110];
+        else if(v==='Deprecada') d.cell.styles.textColor=[200,30,60];
+        else if(v==='Mantenimiento') d.cell.styles.textColor=[170,110,0];
+      }
+    }
+  });
+  pdfFooter(doc);
+  doc.save(`Reporte_Apps_${today()}.pdf`);
+  toast('PDF de apps generado','ok');
+};
+
+$('#btnExportAll').onclick = ()=>{
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('landscape','mm','a4');
+  const kpis = [
+    {lab:'Usuarios', val:DB.users.length},
+    {lab:'Apps Core', val:DB.apps.length},
+    {lab:'Usuarios activos', val:DB.users.filter(u=>u.estado==='Activo').length},
+    {lab:'Apps activas', val:DB.apps.filter(a=>a.estado==='Activa').length},
+    {lab:'Suspendidos', val:DB.users.filter(u=>u.estado==='Suspendido').length},
+    {lab:'En mantenimiento', val:DB.apps.filter(a=>a.estado==='Mantenimiento').length}
+  ];
+  pdfHeader(doc,'Reporte Global del Sistema','Usuarios + Apps Core · todas las variantes');
+  pdfKPIs(doc,kpis);
+  let y = 42 + Math.ceil(kpis.length/3)*18 + 2;
+  doc.setTextColor(0,229,255); doc.setFontSize(11); doc.setFont('helvetica','bold');
+  doc.text('USUARIOS', 14, y+4);
+  doc.autoTable({
+    startY: y+6,
+    head:[['Nombre','Email','Rol','Estado','App Core','Alta']],
+    body: DB.users.map(r=>[r.nombre,r.email,r.rol,r.estado,r.app||'—',fmtDate(r.fecha)]),
+    styles:{ fontSize:8, cellPadding:2, textColor:[30,40,60] },
+    headStyles:{ fillColor:[10,14,26], textColor:[0,229,255], fontStyle:'bold', fontSize:8 },
+    alternateRowStyles:{ fillColor:[240,245,255] }
+  });
+  y = doc.lastAutoTable.finalY + 8;
+  doc.setTextColor(124,92,255); doc.setFontSize(11); doc.setFont('helvetica','bold');
+  doc.text('APPS CORE', 14, y);
+  doc.autoTable({
+    startY: y+2,
+    head:[['App','Versión','Ambiente','Estado','Responsable','Actualización']],
+    body: DB.apps.map(r=>[r.nombre,r.version,r.ambiente,r.estado,r.responsable||'—',fmtDate(r.fecha)]),
+    styles:{ fontSize:8, cellPadding:2, textColor:[30,40,60] },
+    headStyles:{ fillColor:[10,14,26], textColor:[124,92,255], fontStyle:'bold', fontSize:8 },
+    alternateRowStyles:{ fillColor:[240,245,255] }
+  });
+  pdfFooter(doc);
+  doc.save(`Reporte_Global_${today()}.pdf`);
+  toast('Reporte global generado','ok');
+};
+
+/* ============================================================
+   17. BOOT
+============================================================ */
+function boot(){
+  load();
+  renderAll();
+  pullFromSheet();
+  setSync('off', CONFIG.SHEET_API ? 'Sincronizando…' : 'Modo demo');
+  lucide.createIcons();
+}
+
+if(isLogged()){
+  $('#login').classList.add('hidden');
+  $('#app').classList.remove('hidden');
+  boot();
+} else {
+  lucide.createIcons();
+  sha256('CoreControl2025!').then(h=>console.log('%c🔐 Hash SHA-256 para CONFIG.ADMIN_HASH:','color:#00e5ff;font-weight:bold',h));
+}
+</script>
+</body>
+</html>
